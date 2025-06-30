@@ -24,10 +24,13 @@ class nmf_analyzer:
 
         indent_str = " " * indent + msg
 
-        if alert and self.print_output:
-            # If alert is True, color the message red for jupyter terminal output
-            # if msg is collected for html do not use ESC sequences
-            indent_str =  RED_string + indent_str + Black_string
+        if alert:
+            if self.print_output:
+                # If alert is True, color the message red for jupyter terminal output
+                # if msg is collected for html do not use ESC sequences
+                indent_str =  RED_string + indent_str + Black_string
+            else:
+                indent_str = " " * indent + "  WARNING: " + msg
 
         if self.print_output:
             print(indent_str)
@@ -57,21 +60,56 @@ class nmf_analyzer:
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         self.print_indent(f"Printing NMF hierarchy for user {self.hub.username} at time {now_str} ...", indent=0)
+        # Statistics counters
+        n_locations = 0
+        n_apps = 0
+        n_modules = 0
+        n_instrs = 0
+        n_assets = 0
+        instr_type_counts = {}
+        app_type_counts = {}
+        module_type_counts = {}
+
         for location in self.hierarchy.get_locations():
+            n_locations += 1
             self.print_indent(f"{location}")
             for subnode in location.subnodes:
                 if subnode.type in ("water_abstraction", "water_distribution"):
+                    n_apps += 1
+                    app_type = getattr(subnode, 'type', 'undefined')
+                    app_type_counts[app_type] = app_type_counts.get(app_type, 0) + 1
                     self.print_indent(f"{subnode}", indent=5)
                     for module in subnode.subnodes:
+                        n_modules += 1
+                        module_type = getattr(module, 'type', 'undefined')
+                        module_type_counts[module_type] = module_type_counts.get(module_type, 0) + 1
                         self.print_indent(f"{module}", indent=10)
                         for instr in getattr(module, 'instrumentations', []):
+                            n_instrs += 1
+                            instr_type = getattr(instr, 'type', 'undefined')
+                            instr_type_counts[instr_type] = instr_type_counts.get(instr_type, 0) + 1
                             self.print_indent(f"{instr}", indent=15)
                             for val in getattr(instr, 'value_keys', []):
                                 self.print_indent(f"Value Key: {val}, Thresholds: {instr.thresholds.get(val, []) }", indent=20)
                             for asset in getattr(instr, 'assets', []):
+                                n_assets += 1
                                 self.print_indent(f"{asset}", indent=20)
-        
-        
+
+        # Print statistics summary
+        self.print_indent("---", indent=0)
+        self.print_indent(f"Statistics:", indent=0)
+        self.print_indent(f"Locations: {n_locations}", indent=0)
+        self.print_indent(f"Applications: {n_apps}", indent=0)
+        for app_type, count in sorted(app_type_counts.items()):
+            self.print_indent(f"  {app_type}: {count}", indent=2)
+        self.print_indent(f"Modules: {n_modules}", indent=0)
+        for module_type, count in sorted(module_type_counts.items()):
+            self.print_indent(f"  {module_type}: {count}", indent=2)
+        self.print_indent(f"Instrumentations: {n_instrs}", indent=0)
+        for instr_type, count in sorted(instr_type_counts.items()):
+            self.print_indent(f"  {instr_type}: {count}", indent=2)
+        self.print_indent(f"Assets: {n_assets}", indent=0)
+
         return self.get_output()
 
     def check_non_empty_elems(self, elems : list, error_msg:str, indent: int = 0):

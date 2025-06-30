@@ -1,23 +1,34 @@
 import requests, base64, datetime
-import pandas as pd
+
+from dataclasses import dataclass, field
+from typing import Optional
 
 """
 Connect to the Netilion Hub 
 """
 
-
+@dataclass(init=False)
 class hub_connector:
     """
     Connects to the Netilion Hub and provides methods to interact with it.
-    """
     
-    staging_URL = "https://api.staging-env.netilion.endress.com/v1/"
-    production_URL = "https://api.netilion.endress.com/v1/"
-    production_india_URL = "https://in.api.netilion.endress.com/v1/"
+    For initialisation provide a CREDENTIAL and a region (staging, global, or india). 
+    if you need to do OAUTH2 authentication, provide api_secret when creating the credential.
+    The hub_connector will then use the correct URLs for the selected region.
+    If you do not provide an api_secret, the hub_connector will use basic authentication for the technical user.
 
-    oauth_production_URL = "https://api.netilion.endress.com/oauth/token"
-    oauth_production_india_URL = "https://in.api.netilion.endress.com/oauth/token"
-    oauth_staging_URL = "https://api.staging-env.netilion.endress.com/oauth/token"
+
+    """
+
+
+    # Class-level constants for URLs
+    STAGING_URL = "https://api.staging-env.netilion.endress.com/v1/"
+    PRODUCTION_URL = "https://api.netilion.endress.com/v1/"
+    PRODUCTION_INDIA_URL = "https://in.api.netilion.endress.com/v1/"
+
+    OAUTH_PRODUCTION_URL = "https://api.netilion.endress.com/oauth/token"
+    OAUTH_PRODUCTION_INDIA_URL = "https://in.api.netilion.endress.com/oauth/token"
+    OAUTH_STAGING_URL = "https://api.staging-env.netilion.endress.com/oauth/token"
 
     def __init__(self, credential=None,
                  error_pass_through=False,
@@ -35,14 +46,14 @@ class hub_connector:
         # Determine which environment to use
         production_region = getattr(credential, 'production_region', None)
         if production_region == "Staging":
-            self.hub_URL = self.staging_URL
-            self.oauth_URL = self.oauth_staging_URL
+            self.hub_URL = self.STAGING_URL
+            self.oauth_URL = self.OAUTH_STAGING_URL
         elif production_region == "Global":
-            self.hub_URL = self.production_URL
-            self.oauth_URL = self.oauth_production_URL
+            self.hub_URL = self.PRODUCTION_URL
+            self.oauth_URL = self.OAUTH_PRODUCTION_URL
         elif production_region == "India":
-            self.hub_URL = self.production_india_URL
-            self.oauth_URL = self.oauth_production_india_URL
+            self.hub_URL = self.PRODUCTION_INDIA_URL
+            self.oauth_URL = self.OAUTH_PRODUCTION_INDIA_URL
         else:
             raise ValueError("production_region must be None, 'Global', or 'India'")
 
@@ -53,7 +64,7 @@ class hub_connector:
         astr = astr.encode("ascii")
         self.auth_str = b"Basic " + base64.b64encode(astr)
 
-    def ensure_oauth_token(self):
+    def _ensure_oauth_token(self):
 
         payload = None
 
@@ -79,6 +90,17 @@ class hub_connector:
             self.bearer_token_expires_at = datetime.datetime.fromtimestamp(bt_ts)
 
     def call_hub(self,  cmd='', verb='GET', params='', payload='', fullCMD=False):
+        """
+        Call the LCM Hub API.
+        CMD: the command to call, without the base URL if fullCMD is False
+        VERB: the HTTP verb to use (GET, POST, PUT, DELETE, etc.) default is GET
+        """
+
+        verb = verb.upper()
+        allowed_verbs = {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
+        if verb not in allowed_verbs:
+            raise ValueError(f"HTTP verb '{verb}' is not allowed. Must be one of {allowed_verbs}.")
+        
         headers = {
             'Accept': "application/json",
             'Content-Type': "application/json",
@@ -88,7 +110,7 @@ class hub_connector:
 
         if self.api_secret is not None:
             # oauth2
-            self.ensure_oauth_token()
+            self._ensure_oauth_token()
             headers['Authorization'] = self.bearer_token["token_type"] + " " + self.bearer_token["access_token"]
         else:
             # basic auth
@@ -122,6 +144,8 @@ class hub_connector:
         Call the LCM Hub with pagination support.
         cmd: the command to call, including the base URL
         next_key: the key to use for pagination (e.g., "next")
+
+        Assumes a GET request and that the response contains a "pagination" field with the next URL.
         """
         if not cmd.startswith(self.hub_URL):
             cmd = self.hub_URL + cmd
@@ -140,8 +164,6 @@ class hub_connector:
     
 
 # Data class for credentials
-from dataclasses import dataclass, field
-from typing import Optional
 
 @dataclass
 class credential:

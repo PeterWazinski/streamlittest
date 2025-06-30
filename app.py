@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from hub_connector import hub_connector, credential
 from nmf_analyzer import nmf_analyzer
 
@@ -24,7 +25,6 @@ with col3:
 
 with col4:
     run_consistency = st.button("Run integrity check")
-
 
 
 if not all([user, pwd, api_key]):

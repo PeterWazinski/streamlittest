@@ -6,7 +6,10 @@ from hub_connector import hub_connector
 @dataclass
 class NMFhierarchy:
 
-    """Class to hold the NMF hierarchy and its elements."""
+    """Class to hold the NMF hierarchy and its elements.
+
+    This class retrieves the NMF hierarchy from the Netilion Hub and creates a local representation as forest graph.
+    """
 
     hub: hub_connector
     nmf_nodes: dict[int, "NMFnode"]
@@ -76,9 +79,11 @@ class NMFhierarchy:
         for node_id, node in nodes.items():
             pid = node.get("parent_id")
             nmf_node = self.nmf_nodes[node_id]
+            # print(f"Creating node {nmf_node} with parent {pid}")
             if pid is not None:
                 parent_node = self.nmf_nodes.get(pid)
-                parent_node.subnodes.append(nmf_node)
+                if parent_node is not None and isinstance(parent_node, NMFnode):
+                    parent_node.subnodes.append(nmf_node)
 
             nmf_node.instrumentations = [self.nmf_instrumentations[instr_id]
                                          for instr_id in node["instrumentations"]]
@@ -95,7 +100,9 @@ class NMFhierarchy:
                 a.instrumentations.append(instr)               
 
     def get_node_info(self):
-        # retrieving node information
+        """ retrieving node information from the hub
+            The command retrieves nodes with their type, instrumentations, parent node, and parent type.
+        """
         cmd = "nodes?include=type%2Cinstrumentations%2Cinstrumentations.type%2Cparent%2Cparent.type"
         response = self.hub.call_hub_pagination(cmd=cmd, next_key="nodes")
         nodes = dict()
@@ -113,7 +120,8 @@ class NMFhierarchy:
         return nodes
    
     def get_instrumentation_info(self):
-        # retrieving instrumentation information
+        """
+        Retrieves instrumentation information from the hub, including assets, specifications, values, and thresholds."""
 
         cmd="instrumentations?include=type%2Cassets%2Cassets.product%2Cparent%2Cspecifications%2Cvalues%2Cthresholds"
         response = self.hub.call_hub_pagination(cmd=cmd, next_key="instrumentations")
@@ -198,9 +206,19 @@ class NMFnode(NMFelement):
 
     def __str__(self):
         return f"node({self.id}, '{self.name}', {self.type})"
+    
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        return isinstance(other, NMFnode) and self.id == other.id
 
 @dataclass
 class NMFinstrumentation(NMFelement):
+    """
+    Class to represent an NMF instrumentation.
+    you may also delete_value_key() s from the instrumentation, which will also delete the values from the assets.
+    """
     tag: str
     type: str
     parent: Optional["NMFnode"] = None
@@ -212,6 +230,27 @@ class NMFinstrumentation(NMFelement):
 
     def __str__(self):
         return f"instr({self.id}, '{self.tag}', {self.type}, '{self.primary_val_key}')"
+    
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        return isinstance(other, NMFinstrumentation) and self.id == other.id
+    
+    def delete_value_key(self, key: str, hub: hub_connector):
+        """Delete a value key from the instrumentation:
+           Delete the values from the asset underneath and from the instrumentation itself.
+        """
+        if key not in self.value_keys:
+            print(f"WARNING: Value key '{key}' not found in instrumentation {self}.")
+            return
+
+        for a in self.assets:
+            del_cmd = f"assets/{a.id}/values/{key}?to=2099-01-01T00%3A00%3A00&with_references=true"
+            # we only need to delete the values from the assets with references = true. that also deletes it from the instrumentation.
+            print (f"Deleting value key '{key}' from asset {a} and instrumentation {self}.")
+            hub.call_hub(verb='DELETE', cmd=del_cmd)
+
 
 @dataclass
 class NMFasset(NMFelement):  
@@ -222,4 +261,9 @@ class NMFasset(NMFelement):
 
     def __str__(self):
         return f"asset({self.id}, '{self.serial_number}', '{self.prod_code}')"
-  
+    
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        return isinstance(other, NMFasset) and self.id == other.id

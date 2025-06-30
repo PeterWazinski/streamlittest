@@ -2,6 +2,8 @@ from hub_connector import hub_connector
 from NMFhierarchy import NMFhierarchy
 
 class nmf_analyzer:
+    """ Class to analyze the NMF hierarchy and check its integrity.
+    This class provides methods to print the NMF hierarchy and check its integrity."""
 
 
     def __init__(self, hub: hub_connector):
@@ -154,6 +156,9 @@ class nmf_analyzer:
         if not self.check_non_empty_elems(instr.assets, f"Instrumentation {instr} has no assets.", indent=indent):
             return
 
+        if instr.type == "undefined":
+            self.print_indent(f"Instrumentation {instr} has type 'undefined'.", indent=indent, alert=True)
+
         if instr.primary_val_key is None:
             self.print_indent(f"Instrumentation {instr} has no primary value key specification.", indent=indent, alert=True)
 
@@ -161,10 +166,10 @@ class nmf_analyzer:
             self.print_indent(f"Instrumentation {instr} has no value keys/values.", indent=indent, alert=True)
 
         if instr.type == "flow":
-            if not "totalizer1 in instr.value_keys":
+            if not "totalizer1" in instr.value_keys:
                 self.print_indent(f"Instrumentation {instr} of type 'flow' has no 'totalizer1' value key.", indent=indent, alert=True)
 
-            if not "volumeflow in instr.value_keys":
+            if not "volumeflow" in instr.value_keys:
                 self.print_indent(f"Instrumentation {instr} of type 'flow' has no 'volumeflow' value key.", indent=indent, alert=True)
             else:
                 limits = { type: (name,val) for (name,type,val) in instr.thresholds.get("volumeflow", {})}
@@ -182,3 +187,6 @@ class nmf_analyzer:
                 if not limits.get("lower", None):
                     self.print_indent(f"Instrumentation {instr} of type '{instr.type}' has no lower threshold for '{k}'.", indent=indent, alert=True)
 
+        if instr.type == "pump":
+            if not "individual_pump_on" in instr.value_keys:
+                self.print_indent(f"Instrumentation {instr} of type 'pump' has no 'individual_pump_on' value key.", indent=indent, alert=True)  

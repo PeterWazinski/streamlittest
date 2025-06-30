@@ -3,9 +3,9 @@ import streamlit.components.v1 as components
 from hub_connector import hub_connector, credential
 from nmf_analyzer import nmf_analyzer
 
-st.set_page_config(page_title="Peter's NMF Analyzer", page_icon=":sun_with_face:", layout="wide")
+st.set_page_config(page_title="NMF Analyzer", page_icon=":sun_with_face:", layout="wide")
 
-st.title("Very cool NMF Analyzer")
+st.title("Very cool NMF Analyzer (last update 30-06-2025)")
 
 st.header("Enter Credentials & Region")
 col1, col2 = st.columns(2)

@@ -1,3 +1,4 @@
+from urllib import response
 import requests, base64, datetime
 
 from dataclasses import dataclass, field
@@ -155,10 +156,13 @@ class hub_connector:
 
         while next_url is not None:
             response = self.call_hub(cmd=next_url, fullCMD=True)
+           # print(f"nextkey {next_key} ", response.get(next_key))
             all_results.extend(response.get(next_key) or [])
 
             # Check for pagination
-            next_url = response.get("pagination", {}).get(next_key)
+            # print(f"Next URL: {response.get('pagination', {}).get('next')}")
+            
+            next_url = response.get("pagination", {}).get("next")
 
         return all_results
     

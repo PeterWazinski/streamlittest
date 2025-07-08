@@ -1,7 +1,10 @@
+from arrow import get
 from hub_connector import hub_connector
 from NMFhierarchy import NMFhierarchy
 
 class nmf_analyzer:
+
+    
     """ Class to analyze the NMF hierarchy and check its integrity.
     This class provides methods to print the NMF hierarchy and check its integrity."""
 
@@ -228,3 +231,85 @@ class nmf_analyzer:
         if instr.type == "pump":
             if not "individual_pump_on" in instr.value_keys:
                 self.print_indent(f"Instrumentation {instr} of type 'pump' has no 'individual_pump_on' value key.", indent=indent, alert=True)  
+
+
+    def group_instr_by_latest_values(self):
+        """
+        Groups all instrumentations in the hierarchy by the recency of their latest measurement value.
+        Returns three lists of tuples (instr, latest_timestamp):
+            - i_24: instrumentations with at least one value <24h old
+            - i_24_72: instrumentations with no value <24h but at least one <72h old
+            - i_72: instrumentations with no value <72h old
+        Also returns a dict latest_instr_values (currently unused) for possible future extension.
+        Timestamps are handled as pandas Timestamps and compared in UTC.
+        """
+
+        instrumentations = list(self.hierarchy.nmf_instrumentations.values())
+        latest_instr_values = {}
+
+        i_24= []
+        i_24_72 = []
+        i_72 = []
+
+        for instr in instrumentations:
+            cmd = f"instrumentations/{instr.id}/values"
+            latest_values = self.hub.call_hub(cmd=cmd).get("values", [])
+
+            if not latest_values: continue
+
+            import pandas as pd
+            latest_timestamps = [ pd.to_datetime(latest_values.get("timestamp"))
+                                 for latest_values in latest_values 
+                                 if latest_values.get("timestamp")]
+            latest_instr_ts = max(latest_timestamps)
+           #print(f"Found {latest_instr_ts} for instrumentation {inst}")
+
+            import datetime
+            now = pd.Timestamp.now().tz_localize('UTC')
+            
+            age = now - latest_instr_ts
+            #print(f"Instrumentation {instr} latest value timestamp: {latest_instr_ts}, age: {age}")
+            if age < pd.Timedelta(hours=24):
+                i_24.append((instr, latest_instr_ts))
+            elif age < pd.Timedelta(hours=72):
+                i_24_72.append((instr, latest_instr_ts))
+            else:
+                i_72.append((instr, latest_instr_ts))
+
+        return i_24, i_24_72, i_72, latest_instr_values
+
+    def analyse_instr_timeseries(self, print_output: bool = True):
+        """
+        Analyzes all instrumentations in the hierarchy and reports the recency of their measurement entries by value key.
+        For each instrumentation, groups value keys into:
+            - those with at least one measurement in the last 24 hours
+            - those with no measurement in the last 24 hours but at least one in the last 72 hours
+            - those with no measurement in the last 72 hours
+        Uses get_grouped_value_keys for grouping and prints a summary for each group.
+        """
+
+        self.reset_output()
+        self.print_output = print_output
+
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        i_24, i_24_72, i_72, latest_instr_values = self.group_instr_by_latest_values()
+        self.print_indent(f"Analysing timeseries data at {now_str} for {len(i_24) + len(i_24_72) + len(i_72)} instrumentations...")
+
+        self.print_indent(f"  Instrumentations with at least one measurement entry younger than 24h:")
+        for (instr, latest_instr_ts) in i_24:
+            self.print_indent(f"     {instr} (latest timestamp: {latest_instr_ts})")
+
+        self.print_indent(f"  Instrumentations with no measurement entry younger than 24h but at least one younger than 72h:")
+        for (instr, latest_instr_ts) in i_24_72:
+            self.print_indent(f"     {instr} (latest timestamp: {latest_instr_ts})")
+
+        self.print_indent(f"  Instrumentations with no measurement entry younger than 72h:")
+        for (instr, latest_instr_ts) in i_72:
+            self.print_indent(f"     {instr} (latest timestamp: {latest_instr_ts})")
+
+        return self.get_output()
+
+
+           

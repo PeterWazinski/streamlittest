@@ -19,12 +19,15 @@ with col2:
     region = st.selectbox("Netilion Region", options=["Global", "India", "Staging"], index=1)
 st.markdown("---")
 
-col3, col4 = st.columns(2)
+col3, col4, col5 = st.columns(3)
 with col3:
     run_structure = st.button("Run structure analysis")
 
 with col4:
     run_consistency = st.button("Run integrity check")
+
+with col5:
+    run_recency = st.button("Run recency check")
 
 
 if not all([user, pwd, api_key]):
@@ -45,6 +48,8 @@ else:
             output = analyzer.print_nmf_hierarchy(print_output=False)  
         elif run_consistency:
             output = analyzer.check_nmf_integrity(print_output=False)
+        elif run_recency:
+            output = analyzer.analyse_instr_timeseries(print_output=False)
 
 
         response = st.text_area("Output", value=output, height=800, label_visibility="hidden")

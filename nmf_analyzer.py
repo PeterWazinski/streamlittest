@@ -1,4 +1,4 @@
-from arrow import get
+
 from hub_connector import hub_connector
 from NMFhierarchy import NMFhierarchy
 

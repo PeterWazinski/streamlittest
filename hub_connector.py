@@ -140,13 +140,14 @@ class hub_connector:
 
         return jresponse
 
-    def call_hub_pagination(self, cmd='', next_key=''):
+    def call_hub_pagination(self, cmd='', response_key=''):
         """
         Call the LCM Hub with pagination support.
         cmd: the command to call, including the base URL
-        next_key: the key to use for pagination (e.g., "next")
+        response_key: the key in the response whose values should be accumulated (e.g., "data", "nodes").
 
         Assumes a GET request and that the response contains a "pagination" field with the next URL.
+        Accumulates all items from each page under the given response_key.
         """
         if not cmd.startswith(self.hub_URL):
             cmd = self.hub_URL + cmd
@@ -156,12 +157,11 @@ class hub_connector:
 
         while next_url is not None:
             response = self.call_hub(cmd=next_url, fullCMD=True)
-           # print(f"nextkey {next_key} ", response.get(next_key))
-            all_results.extend(response.get(next_key) or [])
+            # print(f"response_key {response_key} ", response.get(response_key))
+            all_results.extend(response.get(response_key) or [])
 
             # Check for pagination
             # print(f"Next URL: {response.get('pagination', {}).get('next')}")
-            
             next_url = response.get("pagination", {}).get("next")
 
         return all_results

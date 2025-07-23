@@ -1,6 +1,8 @@
 
+
+import pandas as pd
 from hub_connector import hub_connector
-from NMFhierarchy import NMFhierarchy
+from NMFhierarchy import NMFhierarchy, NMFinstrumentation
 
 class nmf_analyzer:
 
@@ -218,7 +220,7 @@ class nmf_analyzer:
                     self.print_indent(f"Instrumentation {instr} of type 'flow' has no upper threshold for 'volumeflow'.", indent=indent, alert=True)
 
         if instr.type == "pressure" or instr.type == "analysis":
-            self.print_indent(f"Checking thresholds for instrumentation {instr} of type '{instr.type}' ...", indent=indent)
+            #self.print_indent(f"Checking thresholds for instrumentation {instr} of type '{instr.type}' ...", indent=indent)
             for k in instr.value_keys:
                 limits = { type: (name,val) for (name,type,val) in instr.thresholds.get(k, {})}
                                         
@@ -278,7 +280,7 @@ class nmf_analyzer:
 
         return i_24, i_24_72, i_72, latest_instr_values
 
-    def analyse_instr_timeseries(self, print_output: bool = True):
+    def analyse_instr_process_values(self, print_output: bool = True):
         """
         Analyzes all instrumentations in the hierarchy and reports the recency of their measurement entries by value key.
         For each instrumentation, groups value keys into:
@@ -299,17 +301,74 @@ class nmf_analyzer:
 
         self.print_indent(f"  Instrumentations with at least one measurement entry younger than 24h:")
         for (instr, latest_instr_ts) in i_24:
-            self.print_indent(f"     {instr} (latest timestamp: {latest_instr_ts})")
+            ts = pd.to_datetime(latest_instr_ts).replace(microsecond=0)
+            ts_str = ts.isoformat(sep=' ')
+            if ts_str.endswith('+00:00'):
+                ts_str = ts_str[:-6]
+            self.print_indent(f"     {instr} (latest timestamp: {ts_str})")
 
         self.print_indent(f"  Instrumentations with no measurement entry younger than 24h but at least one younger than 72h:")
         for (instr, latest_instr_ts) in i_24_72:
-            self.print_indent(f"     {instr} (latest timestamp: {latest_instr_ts})")
+            ts = pd.to_datetime(latest_instr_ts).replace(microsecond=0)
+            ts_str = ts.isoformat(sep=' ')
+            if ts_str.endswith('+00:00'):
+                ts_str = ts_str[:-6]
+            self.print_indent(f"     {instr} (latest timestamp: {ts_str})")
 
         self.print_indent(f"  Instrumentations with no measurement entry younger than 72h:")
         for (instr, latest_instr_ts) in i_72:
-            self.print_indent(f"     {instr} (latest timestamp: {latest_instr_ts})")
+            ts = pd.to_datetime(latest_instr_ts).replace(microsecond=0)
+            ts_str = ts.isoformat(sep=' ')
+            if ts_str.endswith('+00:00'):
+                ts_str = ts_str[:-6]
+            self.print_indent(f"     {instr} (latest timestamp: {ts_str})")
 
         return self.get_output()
 
 
-           
+    def analyze_cycle_time(self, ins : NMFinstrumentation = None, days_back: int = 30, value_key: str = None, print_output: bool = True):
+        """
+        Analyzes the cycle timeseries for a given value key.
+        Retrieves values from the hub and returns them as a list of dictionaries.
+        If from_ and to_ are not provided, uses the last 7 days as default range.
+        """
+
+
+        from timeseries import Timeseries  
+
+        if ins is None:
+            ins = self.hierarchy.nmf_instrumentations.values()[0]  # Use the first instrumentation if none provided
+
+        ts = Timeseries(hub=self.hub, instrumentation=ins, days_back=days_back, 
+                        value_keys=[value_key] if value_key else None)
+        
+        stats = ts.cycle_statistics()
+
+
+        self.reset_output()
+        self.print_output = print_output
+
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        self.print_indent(f"Analyzing cycle times for instrumentation {ins} and value key '{value_key}' at {now_str} ...", indent=0)
+        self.print_indent("") 
+        self.print_indent(f"#measurements:        {stats['num_entries']}", indent=5)
+        self.print_indent(f"First timestamp:      {stats['first_timestamp']}", indent=5)
+        self.print_indent(f"Last timestamp:       {stats['last_timestamp']}", indent=5)
+        self.print_indent(f"Time range:           {stats['time_range']}", indent=5)
+        self.print_indent(f"Median interval:      {stats['median_interval']} minutes", indent=5)
+        self.print_indent(f"Mode interval:        {stats['mode_interval']} minutes", indent=5)
+        self.print_indent(f"Last seen:            {stats['age_last_timestamp']} ago", indent=5)
+
+        self.print_indent("") 
+        self.print_indent(f"Using IQR analysis we infer the following cycle time(s) for process values:", indent=5)
+        for cycle in stats['regular_cycles'].unique():
+            self.print_indent(f"{cycle} minutes", indent=8)
+
+        self.print_indent("")
+        self.print_indent(f"Using IQR analysis we infer the following transmission outages:", indent=5)
+        for key, value in stats['outlier_cycles'].items():
+            self.print_indent(f"At {key}: {value // 60} hours {value % 60} minutes transmission outage", indent=8)
+
+        return self.get_output() 

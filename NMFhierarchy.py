@@ -104,7 +104,7 @@ class NMFhierarchy:
             The command retrieves nodes with their type, instrumentations, parent node, and parent type.
         """
         cmd = "nodes?include=type%2Cinstrumentations%2Cinstrumentations.type%2Cparent%2Cparent.type"
-        response = self.hub.call_hub_pagination(cmd=cmd, next_key="nodes")
+        response = self.hub.call_hub_pagination(cmd=cmd, response_key="nodes")
         nodes = dict()
 
         for node in response:
@@ -121,10 +121,11 @@ class NMFhierarchy:
    
     def get_instrumentation_info(self):
         """
-        Retrieves instrumentation information from the hub, including assets, specifications, values, and thresholds."""
+        Retrieves instrumentation information from the hub, including assets, specifications, values, and thresholds.
+        """
 
         cmd="instrumentations?include=type%2Cassets%2Cassets.product%2Cparent%2Cspecifications%2Cvalues%2Cthresholds"
-        response = self.hub.call_hub_pagination(cmd=cmd, next_key="instrumentations")
+        response = self.hub.call_hub_pagination(cmd=cmd, response_key="instrumentations")
         instrumentations = dict()
         assets = dict()
 

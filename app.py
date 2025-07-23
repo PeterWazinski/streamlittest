@@ -49,7 +49,7 @@ else:
         elif run_consistency:
             output = analyzer.check_nmf_integrity(print_output=False)
         elif run_recency:
-            output = analyzer.analyse_instr_timeseries(print_output=False)
+            output = analyzer.analyse_instr_process_values(print_output=False)
 
 
         response = st.text_area("Output", value=output, height=800, label_visibility="hidden")

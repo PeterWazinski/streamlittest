@@ -5,7 +5,7 @@ from nmf_analyzer import nmf_analyzer
 
 st.set_page_config(page_title="Netilion Water Analyzer", page_icon=":sun_with_face:", layout="wide")
 
-st.title("Very cool Netilion Water Analyzer (last update 08-07-2025)")
+st.title("Very cool Netilion Water Analyzer (last update 23-07-2025)")
 
 st.header("Enter Credentials & Region")
 col1, col2 = st.columns(2)
